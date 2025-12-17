@@ -2,6 +2,12 @@ import dlt
 from pyspark.ssql.functions import from_json, col, lit
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType, DoubleType 
 
+schema = StructType([
+    StructField("date", StringType()),
+    StructField("time", StringType()),
+    StructField("room", StringType()),
+    StructField("state", StringType())
+])
 
 kenesis_config = {
     "streamName": "iot-device-data"
