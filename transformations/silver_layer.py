@@ -16,7 +16,7 @@ def silver_iot_events():
     
     df = df.withColumn(
         "event_datetime",
-        to_timestamp(concat_ws(" ", col("date"), col("time")), "yyyy-MM-dd HH:mm:ss")
+        to_timestamp(concat_ws(" ", col("date"), col("time")), "yyyy-MM-dd HH:mm:ss.SSSSSS")
     ).drop("date", "time")
     
     window = Window.partitionBy("room", "event_datetime").orderBy("event_datetime")
