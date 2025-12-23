@@ -21,7 +21,7 @@ def silver_iot_events():
         to_timestamp(concat_ws(" ", col("date"), col("time")), "yyyy-MM-dd HH:mm:ss.SSSSSS")
     ).withColumn("state", trim(col("state"))).drop("time")
     
-    return df.dropDuplicates(["room", "event_datetime"])
+    return (df.withWatermark("event_datetime", "1 hour").dropDuplicates(["room", "event_datetime"]))
 
 @dlt.table(
     name="security_alerts",
