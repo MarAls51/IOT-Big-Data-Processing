@@ -3,7 +3,6 @@ import mlflow
 from pyspark.sql.functions import concat_ws, to_timestamp, col, trim, collect_list, array, size
 from pyspark.sql.window import Window
 
-# Load MLflow model as Spark UDF
 predict_anomaly_udf = mlflow.pyfunc.spark_udf(
     spark, 
     model_uri="models:/home_security_model/production"
