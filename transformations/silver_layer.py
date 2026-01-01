@@ -1,6 +1,6 @@
 import dlt
 import mlflow
-from pyspark.sql.functions import concat_ws, to_timestamp, col, trim, collect_list, array, size
+from pyspark.sql.functions import concat_ws, to_timestamp, col, trim, max as spark_max, collect_list, size
 from pyspark.sql.window import Window
 
 predict_anomaly_udf = mlflow.pyfunc.spark_udf(
@@ -16,7 +16,6 @@ predict_anomaly_udf = mlflow.pyfunc.spark_udf(
         "delta.autoOptimize.optimizeWrite": "true"
     }
 )
-
 def silver_iot_events():
     df = dlt.read_stream("bronze_iot_events")
     
@@ -35,20 +34,34 @@ def silver_iot_events():
     name="security_alerts",
     comment="Real-time security and health anomalies detected via ML inference"
 )
-
 def security_alerts():
     df = dlt.read_stream("silver_iot_events")
-    
-    seq_window = Window.partitionBy("sensor").orderBy("event_datetime").rowsBetween(-59, 0)
-    
+
     df = df.withColumn("state_flag", (col("state") == "ON").cast("integer"))
+
+    df_pivot = (
+        df.groupBy("event_datetime")
+          .pivot("sensor")  # one column per sensor
+          .agg(spark_max("state_flag"))  # if multiple events per timestamp, take max
+    )
     
-    df_sequences = df.withColumn("sequence", collect_list("state_flag").over(seq_window)).filter(size(col("sequence")) == 60)
+    # Fill missing sensor values with 0
+    sensor_cols = [c for c in df_pivot.columns if c != "event_datetime"]
+    for c in sensor_cols:
+        df_pivot = df_pivot.fillna({c: 0})
+
+    seq_window = Window.orderBy("event_datetime").rowsBetween(-59, 0)
     
+    df_sequences = (
+        df_pivot
+        .withColumn("sequence", collect_list(array(*sensor_cols)).over(seq_window))
+        .filter(size(col("sequence")) == 60)
+    )
+
     df_with_predictions = df_sequences.withColumn(
         "is_anomaly",
         predict_anomaly_udf(col("sequence"))
     )
-    
+
     return df_with_predictions.filter(col("is_anomaly") == True)
 
